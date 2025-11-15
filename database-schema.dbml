@@ -1,0 +1,223 @@
+// Optimized Database Schema (DBML)
+// Dapat digunakan di dbdiagram.io
+// Optimasi: indexes, composite keys, dan relasi yang efisien
+
+Table users {
+  userId varchar(36) [pk]
+  googleId varchar(255) [unique]
+  username varchar(255) [unique, not null]
+  email varchar(255) [unique, not null]
+  password varchar(255)
+  profilePic text
+  bio text
+  createdAt timestamp [default: `now()`]
+  updatedAt timestamp [default: `now()`]
+  followersCount int [default: 0]
+  followingCount int [default: 0]
+  role varchar(50) [default: "member"]
+  star int [default: 0]
+  isBanned boolean [default: false]
+  banReason text
+  bannedBy varchar(36)
+  postsCount int [default: 0]
+  isEmailVerified boolean [default: false]
+  emailVerificationToken varchar(255)
+  emailVerificationExpires timestamp
+  passwordResetToken varchar(255)
+  passwordResetExpires timestamp
+  lastLoginAt timestamp
+  
+  indexes {
+    (username, email) [name: 'idx_user_lookup']
+    googleId [name: 'idx_google_id']
+    isBanned [name: 'idx_banned_users']
+    emailVerificationToken [name: 'idx_email_verify_token']
+    passwordResetToken [name: 'idx_password_reset_token']
+    isEmailVerified [name: 'idx_email_verified']
+  }
+}
+
+Table posts {
+  postId varchar(36) [pk]
+  userId varchar(36) [not null, ref: > users.userId]
+  title varchar(500) [not null]
+  description text
+  content text
+  category varchar(100) [not null]
+  mediaUrl text
+  blurred boolean [default: true]
+  viewsCount int [default: 0]
+  likesCount int [default: 0]
+  sharesCount int [default: 0]
+  createdAt timestamp [default: `now()`]
+  updatedAt timestamp [default: `now()`]
+  isDeleted boolean [default: false]
+  isPublished boolean [default: false]
+  scheduledAt timestamp
+  isScheduled boolean [default: false]
+  
+  indexes {
+    userId [name: 'idx_post_user']
+    (category, isPublished, isDeleted) [name: 'idx_post_category']
+    (createdAt, isPublished) [name: 'idx_post_feed']
+    (scheduledAt, isScheduled) [name: 'idx_scheduled_posts']
+    isDeleted [name: 'idx_post_deleted']
+  }
+}
+
+Table comments {
+  commentId varchar(36) [pk]
+  postId varchar(36) [not null, ref: > posts.postId]
+  userId varchar(36) [not null, ref: > users.userId]
+  content text [not null]
+  likesCount int [default: 0]
+  createdAt timestamp [default: `now()`]
+  isDeleted boolean [default: false]
+  parentId varchar(36) [ref: > comments.commentId]
+  
+  indexes {
+    (postId, isDeleted, createdAt) [name: 'idx_post_comments']
+    (userId, createdAt) [name: 'idx_user_comments']
+    (parentId, isDeleted) [name: 'idx_comment_replies']
+  }
+}
+
+Table likes {
+  likeId varchar(36) [pk]
+  userId varchar(36) [not null, ref: > users.userId]
+  postId varchar(36) [ref: > posts.postId]
+  commentId varchar(36) [ref: > comments.commentId]
+  likeType varchar(20) [not null]
+  createdAt timestamp [default: `now()`]
+  
+  indexes {
+    (userId, postId) [unique, name: 'idx_user_post_like']
+    (userId, commentId) [unique, name: 'idx_user_comment_like']
+    (postId, createdAt) [name: 'idx_post_likes']
+    (commentId, createdAt) [name: 'idx_comment_likes']
+  }
+}
+
+Table followers {
+  followId varchar(36) [pk]
+  followerId varchar(36) [not null, ref: > users.userId]
+  followingId varchar(36) [not null, ref: > users.userId]
+  followedAt timestamp [default: `now()`]
+  isActive boolean [default: true]
+  
+  indexes {
+    (followerId, followingId) [unique, name: 'idx_unique_follow']
+    (followingId, isActive) [name: 'idx_followers_list']
+    (followerId, isActive) [name: 'idx_following_list']
+  }
+}
+
+Table messages {
+  messageId varchar(36) [pk]
+  senderId varchar(36) [not null, ref: > users.userId]
+  receiverId varchar(36) [not null, ref: > users.userId]
+  content text [not null]
+  mediaUrl text
+  isRead boolean [default: false]
+  createdAt timestamp [default: `now()`]
+  isDeleted boolean [default: false]
+  
+  indexes {
+    (receiverId, isRead, createdAt) [name: 'idx_inbox']
+    (senderId, receiverId, createdAt) [name: 'idx_conversation']
+    (receiverId, isDeleted) [name: 'idx_deleted_messages']
+  }
+}
+
+Table notifications {
+  notifId varchar(36) [pk]
+  userId varchar(36) [ref: > users.userId]
+  actorId varchar(36) [not null, ref: > users.userId]
+  type varchar(50) [not null]
+  content text
+  actionUrl text
+  isRead boolean [default: false]
+  createdAt timestamp [default: `now()`]
+  
+  indexes {
+    (userId, isRead, createdAt) [name: 'idx_user_notifications']
+    (actorId, createdAt) [name: 'idx_actor_notifications']
+  }
+}
+
+Table content_sections {
+  sectionId varchar(36) [pk]
+  type varchar(50) [not null]
+  content text
+  src text
+  imageDetail json
+  order int [not null]
+  postId varchar(36) [not null, ref: > posts.postId]
+  createdAt timestamp [default: `now()`]
+  updatedAt timestamp [default: `now()`]
+  
+  indexes {
+    (postId, order) [name: 'idx_post_sections']
+  }
+}
+
+Table roles {
+  id varchar(36) [pk]
+  name varchar(100) [unique, not null]
+  price int [not null]
+  benefit json
+  image text
+  createdAt timestamp [default: `now()`]
+  updatedAt timestamp [default: `now()`]
+  
+  indexes {
+    name [name: 'idx_role_name']
+  }
+}
+
+Table payments {
+  id varchar(36) [pk]
+  orderId varchar(100) [unique, not null]
+  userId varchar(36) [not null, ref: > users.userId]
+  role varchar(100) [ref: > roles.name]
+  amount int [not null]
+  adminFee int [default: 0]
+  totalAmount int [not null]
+  paymentMethod varchar(50) [not null]
+  paymentType varchar(50)
+  status varchar(20) [default: "PENDING"]
+  snapToken text
+  snapRedirectUrl text
+  transactionId varchar(255)
+  midtransTransactionId varchar(255)
+  transactionStatus varchar(50)
+  fraudStatus varchar(50)
+  paymentCode varchar(100)
+  vaNumber varchar(100)
+  bankType varchar(50)
+  expiryTime timestamp
+  paidAt timestamp
+  midtransResponse json
+  midtransAction json
+  star int
+  type varchar(20)
+  createdAt timestamp [default: `now()`]
+  updatedAt timestamp [default: `now()`]
+  
+  indexes {
+    (userId, status, createdAt) [name: 'idx_user_payments']
+    (orderId, status) [name: 'idx_order_status']
+    (status, expiryTime) [name: 'idx_pending_payments']
+    transactionId [name: 'idx_transaction']
+  }
+}
+
+// Enum untuk Payment Status
+// Enum PaymentStatus {
+//   PENDING
+//   SUCCESS
+//   FAILED
+//   CANCELLED
+//   EXPIRED
+// }
+

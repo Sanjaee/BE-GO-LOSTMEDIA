@@ -1,0 +1,57 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+configs/.env
+
+# Build artifacts
+tmp/
+dist/
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test
+*.test
+*.out
+coverage.html
+coverage.xml
+
+# Logs
+*.log
+logs/
+
+# Air
+.air.toml
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+docker-compose.override.yml
+Dockerfile
+.dockerignore
+
