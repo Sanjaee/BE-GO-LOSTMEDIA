@@ -71,7 +71,7 @@ func SendVerificationEmail(email, otpCode string) error {
 // SendPasswordResetEmail sends a password reset email
 func SendPasswordResetEmail(email, token string) error {
 	cfg := config.AppConfig
-	resetURL := fmt.Sprintf("%s/reset-password?token=%s", cfg.Server.FrontendURL, token)
+	resetURL := fmt.Sprintf("%s/auth/reset-password?token=%s", cfg.Server.FrontendURL, token)
 
 	subject := "Reset Your Password - LostMedia"
 	body := GetPasswordResetEmailTemplate(resetURL)
