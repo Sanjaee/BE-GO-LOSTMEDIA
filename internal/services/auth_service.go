@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"log"
 	"lostmediago/internal/models"
 	"lostmediago/internal/repositories"
 	"lostmediago/internal/utils"
@@ -63,11 +64,12 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.User, strin
 				return nil, "", errors.New("failed to update verification token")
 			}
 
-			// Resend verification email with OTP
+			// Resend verification email with OTP (async via message broker)
 			err = mq.PublishVerificationEmail(existingUser.Email, otpCode)
 			if err != nil {
-				// Fallback to direct email send if queue fails
-				_ = utils.SendVerificationEmail(existingUser.Email, otpCode)
+				// Log error but don't block registration
+				// Email will be retried by worker if RabbitMQ recovers
+				log.Printf("[WARNING] Failed to publish verification email to queue: %v", err)
 			}
 
 			// Return existing user with new OTP code (so frontend can redirect to OTP page)
@@ -115,10 +117,13 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.User, strin
 	// Publish verification email to queue (async, non-blocking)
 	err = mq.PublishVerificationEmail(user.Email, otpCode)
 	if err != nil {
-		// Log error but don't fail registration
-		// Fallback to direct email send if queue fails
-		_ = utils.SendVerificationEmail(user.Email, otpCode)
+		// Log error but don't block registration
+		// Email will be retried by worker if RabbitMQ recovers
+		log.Printf("[WARNING] Failed to publish verification email to queue: %v", err)
 	}
+
+	// Publish registration event (async, non-blocking)
+	_ = mq.PublishRegisterEvent(user.UserId, user.Email)
 
 	return user, otpCode, nil
 }
@@ -160,11 +165,12 @@ func (s *authService) Login(req *models.LoginRequest) (*models.User, string, str
 			return nil, "", "", errors.New("failed to update verification token")
 		}
 
-		// Send verification email with OTP
+		// Send verification email with OTP (async via message broker)
 		err = mq.PublishVerificationEmail(user.Email, otpCode)
 		if err != nil {
-			// Fallback to direct email send if queue fails
-			_ = utils.SendVerificationEmail(user.Email, otpCode)
+			// Log error but don't block login
+			// Email will be retried by worker if RabbitMQ recovers
+			log.Printf("[WARNING] Failed to publish verification email to queue: %v", err)
 		}
 
 		// Return error indicating email needs verification (special error code)
@@ -182,8 +188,8 @@ func (s *authService) Login(req *models.LoginRequest) (*models.User, string, str
 		return nil, "", "", errors.New("failed to generate refresh token")
 	}
 
-	// Update last login
-	_ = s.userRepo.UpdateLastLogin(user.UserId)
+	// Publish login event (async via message broker) - includes UpdateLastLogin
+	_ = mq.PublishLoginEvent(user.UserId, user.Email)
 
 	return user, token, refreshToken, nil
 }
@@ -193,7 +199,8 @@ func (s *authService) GoogleOAuth(req *models.GoogleOAuthRequest) (*models.User,
 	existingUser, err := s.userRepo.FindByGoogleID(req.GoogleId)
 	if err == nil && existingUser != nil {
 		// User exists with this Google ID - login
-		_ = s.userRepo.UpdateLastLogin(existingUser.UserId)
+		// Publish login event (async via message broker) - includes UpdateLastLogin
+		_ = mq.PublishLoginEvent(existingUser.UserId, existingUser.Email)
 
 		// Generate tokens
 		token, err := utils.GenerateToken(existingUser.UserId, existingUser.Email, existingUser.Role)
@@ -235,8 +242,8 @@ func (s *authService) GoogleOAuth(req *models.GoogleOAuthRequest) (*models.User,
 			}
 		}
 
-		// Update last login
-		_ = s.userRepo.UpdateLastLogin(existingUser.UserId)
+		// Publish login event (async via message broker) - includes UpdateLastLogin
+		_ = mq.PublishLoginEvent(existingUser.UserId, existingUser.Email)
 
 		// Generate tokens
 		token, err := utils.GenerateToken(existingUser.UserId, existingUser.Email, existingUser.Role)
@@ -279,6 +286,9 @@ func (s *authService) GoogleOAuth(req *models.GoogleOAuthRequest) (*models.User,
 		return nil, "", "", errors.New("failed to create user")
 	}
 
+	// Publish registration event for Google OAuth (async via message broker)
+	_ = mq.PublishRegisterEvent(user.UserId, user.Email)
+
 	// Generate tokens
 	token, err := utils.GenerateToken(user.UserId, user.Email, user.Role)
 	if err != nil {
@@ -290,8 +300,8 @@ func (s *authService) GoogleOAuth(req *models.GoogleOAuthRequest) (*models.User,
 		return nil, "", "", errors.New("failed to generate refresh token")
 	}
 
-	// Update last login
-	_ = s.userRepo.UpdateLastLogin(user.UserId)
+	// Publish login event (async via message broker) - includes UpdateLastLogin
+	_ = mq.PublishLoginEvent(user.UserId, user.Email)
 
 	return user, token, refreshToken, nil
 }
@@ -341,6 +351,9 @@ func (s *authService) VerifyEmail(token string) (*models.User, string, string, e
 		return nil, "", "", errors.New("failed to verify email")
 	}
 
+	// Publish email verified event (async via message broker)
+	_ = mq.PublishEmailVerifiedEvent(user.UserId, user.Email)
+
 	// Generate JWT tokens for auto login
 	accessToken, err := utils.GenerateToken(user.UserId, user.Email, user.Role)
 	if err != nil {
@@ -352,8 +365,8 @@ func (s *authService) VerifyEmail(token string) (*models.User, string, string, e
 		return nil, "", "", errors.New("failed to generate refresh token")
 	}
 
-	// Update last login
-	_ = s.userRepo.UpdateLastLogin(user.UserId)
+	// Publish login event (async via message broker) - includes UpdateLastLogin
+	_ = mq.PublishLoginEvent(user.UserId, user.Email)
 
 	return user, accessToken, refreshToken, nil
 }
@@ -386,6 +399,9 @@ func (s *authService) VerifyOTP(email, otpCode string) (*models.User, string, st
 		return nil, "", "", errors.New("failed to verify email")
 	}
 
+	// Publish email verified event (async via message broker)
+	_ = mq.PublishEmailVerifiedEvent(user.UserId, user.Email)
+
 	// Generate JWT tokens for auto login
 	accessToken, err := utils.GenerateToken(user.UserId, user.Email, user.Role)
 	if err != nil {
@@ -397,8 +413,8 @@ func (s *authService) VerifyOTP(email, otpCode string) (*models.User, string, st
 		return nil, "", "", errors.New("failed to generate refresh token")
 	}
 
-	// Update last login
-	_ = s.userRepo.UpdateLastLogin(user.UserId)
+	// Publish login event (async via message broker) - includes UpdateLastLogin
+	_ = mq.PublishLoginEvent(user.UserId, user.Email)
 
 	return user, accessToken, refreshToken, nil
 }
@@ -428,9 +444,9 @@ func (s *authService) ForgotPassword(email string) error {
 	// Publish password reset email to queue (async, non-blocking)
 	err = mq.PublishPasswordResetEmail(user.Email, resetToken)
 	if err != nil {
-		// Log error but don't fail
-		// Fallback to direct email send if queue fails
-		_ = utils.SendPasswordResetEmail(user.Email, resetToken)
+		// Log error but don't block
+		// Email will be retried by worker if RabbitMQ recovers
+		log.Printf("[WARNING] Failed to publish password reset email to queue: %v", err)
 	}
 
 	return nil
@@ -473,6 +489,9 @@ func (s *authService) ResetPassword(token, newPassword string) (*models.User, st
 		return nil, "", "", errors.New("failed to clear reset token")
 	}
 
+	// Publish password reset event (async via message broker)
+	_ = mq.PublishPasswordResetEvent(user.UserId, user.Email)
+
 	// Generate JWT tokens for auto login
 	accessToken, err := utils.GenerateToken(user.UserId, user.Email, user.Role)
 	if err != nil {
@@ -484,8 +503,8 @@ func (s *authService) ResetPassword(token, newPassword string) (*models.User, st
 		return nil, "", "", errors.New("failed to generate refresh token")
 	}
 
-	// Update last login
-	_ = s.userRepo.UpdateLastLogin(user.UserId)
+	// Publish login event (async via message broker) - includes UpdateLastLogin
+	_ = mq.PublishLoginEvent(user.UserId, user.Email)
 
 	return user, accessToken, refreshToken, nil
 }

@@ -105,5 +105,18 @@ func setupQueues() error {
 		return fmt.Errorf("failed to declare feed_processing_queue: %w", err)
 	}
 
+	// User activity queue for tracking user events
+	_, err = Channel.QueueDeclare(
+		"user_activity_queue", // name
+		true,                  // durable
+		false,                 // delete when unused
+		false,                 // exclusive
+		false,                 // no-wait
+		nil,                   // arguments
+	)
+	if err != nil {
+		return fmt.Errorf("failed to declare user_activity_queue: %w", err)
+	}
+
 	return nil
 }

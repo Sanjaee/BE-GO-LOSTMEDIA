@@ -40,19 +40,23 @@ func main() {
 	}
 	defer database.Close()
 
+	// Initialize repositories (needed before workers)
+	userRepo := repositories.NewUserRepository()
+
 	// Connect to RabbitMQ
 	if err := mq.Connect(); err != nil {
-		log.Printf("Warning: Failed to connect to RabbitMQ: %v. Email sending will use direct method.", err)
+		log.Printf("Warning: Failed to connect to RabbitMQ: %v. Events will not be processed.", err)
 	} else {
 		defer mq.Close()
 		// Start email worker
 		if err := workers.StartEmailWorker(); err != nil {
-			log.Printf("Warning: Failed to start email worker: %v. Email sending will use direct method.", err)
+			log.Printf("Warning: Failed to start email worker: %v. Email events will not be processed.", err)
+		}
+		// Start user activity worker (handles UpdateLastLogin, analytics, etc.)
+		if err := workers.StartUserActivityWorker(userRepo); err != nil {
+			log.Printf("Warning: Failed to start user activity worker: %v. User activity events will not be processed.", err)
 		}
 	}
-
-	// Initialize repositories
-	userRepo := repositories.NewUserRepository()
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo)
