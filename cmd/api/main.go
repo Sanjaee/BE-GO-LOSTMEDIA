@@ -145,17 +145,28 @@ func main() {
 	authService := services.NewAuthService(userRepo)
 	log.Println("[INIT] ✓ Auth service initialized")
 
+	// Initialize post repositories
+	postRepo := repositories.NewPostRepository()
+	likeRepo := repositories.NewLikeRepository()
+	log.Println("[INIT] ✓ Post repositories initialized")
+
+	// Initialize post service
+	postService := services.NewPostService(postRepo, userRepo, likeRepo)
+	log.Println("[INIT] ✓ Post service initialized")
+
 	// Initialize use cases
 	authUsecase := usecases.NewAuthUsecase(authService)
-	log.Println("[INIT] ✓ Auth usecase initialized")
+	postUsecase := usecases.NewPostUsecase(postService, userRepo)
+	log.Println("[INIT] ✓ Usecases initialized")
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authUsecase)
-	log.Println("[INIT] ✓ Auth handler initialized")
+	postHandler := handlers.NewPostHandler(postUsecase)
+	log.Println("[INIT] ✓ Handlers initialized")
 
 	// Setup routes
 	log.Println("[INIT] Setting up routes...")
-	router := delivery.SetupRoutes(authHandler)
+	router := delivery.SetupRoutes(authHandler, postHandler)
 	log.Println("[INIT] ✓ Routes configured")
 
 	// Create HTTP server

@@ -9,22 +9,21 @@ import (
 	"gorm.io/gorm"
 )
 
-// ImageDetail represents JSON structure for image details
-type ImageDetail struct {
-	Width   int    `json:"width,omitempty"`
-	Height  int    `json:"height,omitempty"`
-	Alt     string `json:"alt,omitempty"`
-	Caption string `json:"caption,omitempty"`
-}
+// ImageDetailArray represents array of image URLs (for type "image")
+type ImageDetailArray []string
 
 // Value implements driver.Valuer interface for JSON
-func (i ImageDetail) Value() (driver.Value, error) {
+func (i ImageDetailArray) Value() (driver.Value, error) {
+	if len(i) == 0 {
+		return nil, nil
+	}
 	return json.Marshal(i)
 }
 
 // Scan implements sql.Scanner interface for JSON
-func (i *ImageDetail) Scan(value interface{}) error {
+func (i *ImageDetailArray) Scan(value interface{}) error {
 	if value == nil {
+		*i = nil
 		return nil
 	}
 	bytes, ok := value.([]byte)
@@ -35,15 +34,15 @@ func (i *ImageDetail) Scan(value interface{}) error {
 }
 
 type ContentSection struct {
-	SectionId   string       `json:"sectionId" gorm:"primaryKey;type:varchar(36)"`
-	Type        string       `json:"type" gorm:"type:varchar(50);not null"`
-	Content     *string      `json:"content,omitempty" gorm:"type:text"`
-	Src         *string      `json:"src,omitempty" gorm:"type:text"`
-	ImageDetail *ImageDetail `json:"imageDetail,omitempty" gorm:"type:jsonb"`
-	Order       int          `json:"order" gorm:"not null"`
-	PostId      string       `json:"postId" gorm:"type:varchar(36);not null"`
-	CreatedAt   time.Time    `json:"createdAt" gorm:"default:now()"`
-	UpdatedAt   time.Time    `json:"updatedAt" gorm:"default:now()"`
+	SectionId   string            `json:"sectionId" gorm:"primaryKey;type:varchar(36)"`
+	Type        string            `json:"type" gorm:"type:varchar(50);not null"`
+	Content     *string           `json:"content,omitempty" gorm:"type:text"`
+	Src         *string           `json:"src,omitempty" gorm:"type:text"`
+	ImageDetail *ImageDetailArray `json:"imageDetail,omitempty" gorm:"type:jsonb"` // Array of image URLs
+	Order       int               `json:"order" gorm:"not null"`
+	PostId      string            `json:"postId" gorm:"type:varchar(36);not null"`
+	CreatedAt   time.Time         `json:"createdAt" gorm:"default:now()"`
+	UpdatedAt   time.Time         `json:"updatedAt" gorm:"default:now()"`
 
 	// Relations
 	Post Post `json:"post,omitempty" gorm:"foreignKey:PostId;references:PostId"`

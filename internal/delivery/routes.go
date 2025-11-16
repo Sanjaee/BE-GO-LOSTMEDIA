@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes(authHandler *handlers.AuthHandler) *gin.Engine {
+func SetupRoutes(authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler) *gin.Engine {
 	router := gin.Default()
 
 	// Middleware
@@ -36,6 +36,24 @@ func SetupRoutes(authHandler *handlers.AuthHandler) *gin.Engine {
 			auth.POST("/forgot-password", authHandler.ForgotPassword)
 			auth.POST("/verify-reset-password", authHandler.VerifyResetPassword)
 			auth.POST("/reset-password", authHandler.ResetPassword)
+		}
+
+		// Post routes
+		posts := v1.Group("/posts")
+		{
+			// Public routes
+			posts.GET("", middleware.OptionalAuthMiddleware(), postHandler.GetAllPosts)
+			posts.GET("/:id", middleware.OptionalAuthMiddleware(), postHandler.GetPost)
+
+			// Protected routes (require authentication)
+			postsProtected := posts.Group("", middleware.AuthMiddleware())
+			{
+				postsProtected.POST("", postHandler.CreatePost)
+				postsProtected.PUT("/:id", postHandler.UpdatePost)
+				postsProtected.DELETE("/:id", postHandler.DeletePost)
+				postsProtected.POST("/:id/like", postHandler.LikePost)
+				postsProtected.GET("/user/posts-count", postHandler.GetUserPostsCount)
+			}
 		}
 	}
 
