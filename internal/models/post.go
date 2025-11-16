@@ -15,7 +15,7 @@ type Post struct {
 	Content     *string    `json:"content,omitempty" gorm:"type:text"`
 	Category    string     `json:"category" gorm:"type:varchar(100);not null"`
 	MediaUrl    *string    `json:"mediaUrl,omitempty" gorm:"type:text"`
-	Blurred     bool       `json:"blurred" gorm:"default:true"`
+	Blurred     bool       `json:"blurred" gorm:"default:false"`
 	ViewsCount  int        `json:"viewsCount" gorm:"default:0"`
 	LikesCount  int        `json:"likesCount" gorm:"default:0"`
 	SharesCount int        `json:"sharesCount" gorm:"default:0"`
