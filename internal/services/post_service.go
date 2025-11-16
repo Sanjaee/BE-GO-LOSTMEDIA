@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"lostmediago/internal/models"
 	"lostmediago/internal/repositories"
@@ -24,9 +25,10 @@ type PostService interface {
 }
 
 type postService struct {
-	postRepo repositories.PostRepository
-	userRepo repositories.UserRepository
-	likeRepo repositories.LikeRepository
+	postRepo      repositories.PostRepository
+	userRepo      repositories.UserRepository
+	likeRepo      repositories.LikeRepository
+	searchService *SearchService
 }
 
 func NewPostService(postRepo repositories.PostRepository, userRepo repositories.UserRepository, likeRepo repositories.LikeRepository) PostService {
@@ -34,6 +36,15 @@ func NewPostService(postRepo repositories.PostRepository, userRepo repositories.
 		postRepo: postRepo,
 		userRepo: userRepo,
 		likeRepo: likeRepo,
+	}
+}
+
+func NewPostServiceWithSearch(postRepo repositories.PostRepository, userRepo repositories.UserRepository, likeRepo repositories.LikeRepository, searchService *SearchService) PostService {
+	return &postService{
+		postRepo:      postRepo,
+		userRepo:      userRepo,
+		likeRepo:      likeRepo,
+		searchService: searchService,
 	}
 }
 
@@ -101,6 +112,15 @@ func (s *postService) CreatePost(userId string, req *models.CreatePostRequest) (
 			return nil, err
 		}
 		post.Sections = sections
+	}
+
+	// Index post in BleveSearch if published
+	if s.searchService != nil && post.IsPublished {
+		go func() {
+			if err := s.searchService.IndexPost(context.Background(), post); err != nil {
+				// Log error but don't fail the request
+			}
+		}()
 	}
 
 	return post, nil
@@ -202,7 +222,21 @@ func (s *postService) UpdatePost(postId, userId string, req *models.UpdatePostRe
 	}
 
 	// Reload with relations
-	return s.postRepo.FindByIDWithRelations(postId, &userId)
+	updatedPost, err := s.postRepo.FindByIDWithRelations(postId, &userId)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update index in BleveSearch if published
+	if s.searchService != nil && updatedPost.IsPublished {
+		go func() {
+			if err := s.searchService.IndexPost(context.Background(), updatedPost); err != nil {
+				// Log error but don't fail the request
+			}
+		}()
+	}
+
+	return updatedPost, nil
 }
 
 func (s *postService) DeletePost(postId, userId string) error {
@@ -217,7 +251,21 @@ func (s *postService) DeletePost(postId, userId string) error {
 		return errors.New("unauthorized: you can only delete your own posts")
 	}
 
-	return s.postRepo.Delete(postId)
+	// Soft delete
+	if err := s.postRepo.Delete(postId); err != nil {
+		return err
+	}
+
+	// Remove from search index
+	if s.searchService != nil {
+		go func() {
+			if err := s.searchService.DeletePost(context.Background(), postId); err != nil {
+				// Log error but don't fail the request
+			}
+		}()
+	}
+
+	return nil
 }
 
 func (s *postService) LikePost(postId, userId string) (bool, int, error) {

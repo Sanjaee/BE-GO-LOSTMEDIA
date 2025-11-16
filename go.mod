@@ -13,9 +13,30 @@ require (
 	golang.org/x/crypto v0.44.0
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
+	github.com/blevesearch/bleve/v2 v2.5.5
 )
 
 require (
+	github.com/RoaringBitmap/roaring/v2 v2.4.5 // indirect
+	github.com/bits-and-blooms/bitset v1.22.0 // indirect
+	github.com/blevesearch/bleve/v2 v2.5.5 // indirect
+	github.com/blevesearch/bleve_index_api v1.2.11 // indirect
+	github.com/blevesearch/geo v0.2.4 // indirect
+	github.com/blevesearch/go-faiss v1.0.26 // indirect
+	github.com/blevesearch/go-porterstemmer v1.0.3 // indirect
+	github.com/blevesearch/gtreap v0.1.1 // indirect
+	github.com/blevesearch/mmap-go v1.0.4 // indirect
+	github.com/blevesearch/scorch_segment_api/v2 v2.3.13 // indirect
+	github.com/blevesearch/segment v0.9.1 // indirect
+	github.com/blevesearch/snowballstem v0.9.0 // indirect
+	github.com/blevesearch/upsidedown_store_api v1.0.2 // indirect
+	github.com/blevesearch/vellum v1.1.0 // indirect
+	github.com/blevesearch/zapx/v11 v11.4.2 // indirect
+	github.com/blevesearch/zapx/v12 v12.4.2 // indirect
+	github.com/blevesearch/zapx/v13 v13.4.2 // indirect
+	github.com/blevesearch/zapx/v14 v14.4.2 // indirect
+	github.com/blevesearch/zapx/v15 v15.4.2 // indirect
+	github.com/blevesearch/zapx/v16 v16.2.7 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic v1.14.2 // indirect
 	github.com/bytedance/sonic/loader v0.4.0 // indirect
@@ -29,6 +50,7 @@ require (
 	github.com/go-playground/validator/v10 v10.28.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.6.0 // indirect
@@ -41,11 +63,13 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/quic-go/quic-go v0.56.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
+	go.etcd.io/bbolt v1.4.0 // indirect
 	go.uber.org/mock v0.6.0 // indirect
 	golang.org/x/arch v0.23.0 // indirect
 	golang.org/x/net v0.47.0 // indirect

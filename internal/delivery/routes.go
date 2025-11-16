@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes(authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler) *gin.Engine {
+func SetupRoutes(authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, searchHandler *handlers.SearchHandler) *gin.Engine {
 	router := gin.Default()
 
 	// Middleware
@@ -53,6 +53,15 @@ func SetupRoutes(authHandler *handlers.AuthHandler, postHandler *handlers.PostHa
 				postsProtected.DELETE("/:id", postHandler.DeletePost)
 				postsProtected.POST("/:id/like", postHandler.LikePost)
 				postsProtected.GET("/user/posts-count", postHandler.GetUserPostsCount)
+			}
+		}
+
+		// Search routes
+		if searchHandler != nil {
+			search := v1.Group("/search")
+			{
+				search.POST("/posts", middleware.OptionalAuthMiddleware(), searchHandler.SearchPosts)
+				search.GET("/posts", middleware.OptionalAuthMiddleware(), searchHandler.SearchPosts)
 			}
 		}
 	}

@@ -20,6 +20,7 @@ import (
 	"lostmediago/pkg/cache"
 	"lostmediago/pkg/database"
 	"lostmediago/pkg/mq"
+	"lostmediago/pkg/search"
 
 	"github.com/gin-gonic/gin"
 )
@@ -88,6 +89,22 @@ func main() {
 	userRepo := repositories.NewUserRepository()
 	log.Println("[INIT] ✓ Repositories initialized")
 
+	// Connect to BleveSearch
+	log.Println("[SERVICES] Connecting to BleveSearch...")
+	bleveConnected := false
+	if err := search.Connect(); err != nil {
+		log.Printf("[SERVICES WARNING] Failed to connect to BleveSearch: %v", err)
+		log.Printf("[SERVICES WARNING] Search functionality will be disabled.")
+		log.Println("[SERVICES] ✗ BleveSearch not connected")
+	} else {
+		bleveConnected = true
+		log.Println("[SERVICES] ✓ BleveSearch connected")
+		defer func() {
+			log.Println("[SHUTDOWN] Closing BleveSearch connection...")
+			search.Close()
+		}()
+	}
+
 	// Connect to RabbitMQ
 	log.Println("[SERVICES] Connecting to RabbitMQ message broker...")
 	rabbitmqConnected := false
@@ -138,6 +155,11 @@ func main() {
 	} else {
 		log.Println("  ✗ RabbitMQ Message Broker (Not Connected)")
 	}
+	if bleveConnected {
+		log.Println("  ✓ BleveSearch")
+	} else {
+		log.Println("  ✗ BleveSearch (Not Connected)")
+	}
 	log.Println("-----------------------------------------")
 
 	// Initialize services
@@ -150,9 +172,39 @@ func main() {
 	likeRepo := repositories.NewLikeRepository()
 	log.Println("[INIT] ✓ Post repositories initialized")
 
-	// Initialize post service
-	postService := services.NewPostService(postRepo, userRepo, likeRepo)
-	log.Println("[INIT] ✓ Post service initialized")
+	// Initialize search service
+	var searchService *services.SearchService
+	if bleveConnected {
+		searchService = services.NewSearchService(postRepo)
+		log.Println("[INIT] ✓ Search service initialized")
+
+		// Reindex all published posts in background
+		// Wait a bit for server to be ready, then reindex
+		go func() {
+			// Wait 2 seconds for server to fully start
+			time.Sleep(2 * time.Second)
+			log.Println("[INIT] Starting background reindexing of all published posts...")
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
+			if err := searchService.ReindexAllPosts(ctx); err != nil {
+				log.Printf("[INIT WARNING] Failed to reindex posts: %v", err)
+			} else {
+				log.Println("[INIT] ✓ All published posts reindexed successfully")
+			}
+		}()
+	} else {
+		log.Println("[INIT] ✗ Search service not initialized (BleveSearch not connected)")
+	}
+
+	// Initialize post service (with search if available)
+	var postService services.PostService
+	if searchService != nil {
+		postService = services.NewPostServiceWithSearch(postRepo, userRepo, likeRepo, searchService)
+		log.Println("[INIT] ✓ Post service initialized (with search indexing)")
+	} else {
+		postService = services.NewPostService(postRepo, userRepo, likeRepo)
+		log.Println("[INIT] ✓ Post service initialized")
+	}
 
 	// Initialize use cases
 	authUsecase := usecases.NewAuthUsecase(authService)
@@ -162,11 +214,16 @@ func main() {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authUsecase)
 	postHandler := handlers.NewPostHandler(postUsecase)
+	var searchHandler *handlers.SearchHandler
+	if searchService != nil {
+		searchHandler = handlers.NewSearchHandler(searchService, postUsecase)
+		log.Println("[INIT] ✓ Search handler initialized")
+	}
 	log.Println("[INIT] ✓ Handlers initialized")
 
 	// Setup routes
 	log.Println("[INIT] Setting up routes...")
-	router := delivery.SetupRoutes(authHandler, postHandler)
+	router := delivery.SetupRoutes(authHandler, postHandler, searchHandler)
 	log.Println("[INIT] ✓ Routes configured")
 
 	// Create HTTP server

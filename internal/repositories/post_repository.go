@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"errors"
 	"lostmediago/internal/models"
 	"lostmediago/pkg/database"
@@ -14,6 +15,8 @@ type PostRepository interface {
 	FindByIDWithRelations(postId string, userId *string) (*models.Post, error)
 	FindAll(limit, offset int, userId *string) ([]models.Post, int64, error)
 	FindByUserID(userId string, limit, offset int) ([]models.Post, int64, error)
+	FindByIDs(postIds []string) ([]models.Post, error)
+	FindAllPublished(ctx context.Context) ([]models.Post, error)
 	Update(post *models.Post) error
 	Delete(postId string) error
 	IncrementViews(postId string) error
@@ -165,4 +168,31 @@ func (r *postRepository) PublishScheduledPost(postId string) error {
 			"is_published": true,
 			"is_scheduled": false,
 		}).Error
+}
+
+func (r *postRepository) FindByIDs(postIds []string) ([]models.Post, error) {
+	if len(postIds) == 0 {
+		return []models.Post{}, nil
+	}
+
+	var posts []models.Post
+	err := r.db.Where("post_id IN ? AND is_deleted = ? AND is_published = ?", postIds, false, true).
+		Preload("User").
+		Preload("Sections", func(db *gorm.DB) *gorm.DB {
+			return db.Order("\"order\" ASC")
+		}).
+		Find(&posts).Error
+	return posts, err
+}
+
+func (r *postRepository) FindAllPublished(ctx context.Context) ([]models.Post, error) {
+	var posts []models.Post
+	err := r.db.WithContext(ctx).
+		Where("is_deleted = ? AND is_published = ?", false, true).
+		Preload("User").
+		Preload("Sections", func(db *gorm.DB) *gorm.DB {
+			return db.Order("\"order\" ASC")
+		}).
+		Find(&posts).Error
+	return posts, err
 }
