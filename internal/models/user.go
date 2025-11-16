@@ -1,31 +1,55 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
 
 type User struct {
-	UserId                   string     `json:"userId" db:"userId"`
-	GoogleId                 *string    `json:"googleId,omitempty" db:"googleId"`
-	Username                 string     `json:"username" db:"username"`
-	Email                    string     `json:"email" db:"email"`
-	Password                 *string    `json:"-" db:"password"`
-	ProfilePic               *string    `json:"profilePic,omitempty" db:"profilePic"`
-	Bio                      *string    `json:"bio,omitempty" db:"bio"`
-	CreatedAt                time.Time  `json:"createdAt" db:"createdAt"`
-	UpdatedAt                time.Time  `json:"updatedAt" db:"updatedAt"`
-	FollowersCount           int        `json:"followersCount" db:"followersCount"`
-	FollowingCount           int        `json:"followingCount" db:"followingCount"`
-	Role                     string     `json:"role" db:"role"`
-	Star                     int        `json:"star" db:"star"`
-	IsBanned                 bool       `json:"isBanned" db:"isBanned"`
-	BanReason                *string    `json:"banReason,omitempty" db:"banReason"`
-	BannedBy                 *string    `json:"bannedBy,omitempty" db:"bannedBy"`
-	PostsCount               int        `json:"postsCount" db:"postsCount"`
-	IsEmailVerified          bool       `json:"isEmailVerified" db:"isEmailVerified"`
-	EmailVerificationToken   *string    `json:"-" db:"emailVerificationToken"`
-	EmailVerificationExpires *time.Time `json:"-" db:"emailVerificationExpires"`
-	PasswordResetToken       *string    `json:"-" db:"passwordResetToken"`
-	PasswordResetExpires     *time.Time `json:"-" db:"passwordResetExpires"`
-	LastLoginAt              *time.Time `json:"lastLoginAt,omitempty" db:"lastLoginAt"`
+	UserId                   string     `json:"userId" gorm:"primaryKey;type:varchar(36)"`
+	GoogleId                 *string    `json:"googleId,omitempty" gorm:"type:varchar(255);uniqueIndex"`
+	Username                 string     `json:"username" gorm:"type:varchar(255);not null;index:idx_user_lookup"`
+	Email                    string     `json:"email" gorm:"type:varchar(255);uniqueIndex;not null;index:idx_user_lookup"`
+	Password                 *string    `json:"-" gorm:"type:varchar(255)"`
+	ProfilePic               *string    `json:"profilePic,omitempty" gorm:"type:text"`
+	Bio                      *string    `json:"bio,omitempty" gorm:"type:text"`
+	CreatedAt                time.Time  `json:"createdAt" gorm:"default:now()"`
+	UpdatedAt                time.Time  `json:"updatedAt" gorm:"default:now()"`
+	FollowersCount           int        `json:"followersCount" gorm:"default:0"`
+	FollowingCount           int        `json:"followingCount" gorm:"default:0"`
+	Role                     string     `json:"role" gorm:"type:varchar(50);default:'member'"`
+	Star                     int        `json:"star" gorm:"default:0"`
+	IsBanned                 bool       `json:"isBanned" gorm:"default:false;index:idx_banned_users"`
+	BanReason                *string    `json:"banReason,omitempty" gorm:"type:text"`
+	BannedBy                 *string    `json:"bannedBy,omitempty" gorm:"type:varchar(36)"`
+	PostsCount               int        `json:"postsCount" gorm:"default:0"`
+	IsEmailVerified          bool       `json:"isEmailVerified" gorm:"default:false;index:idx_email_verified"`
+	EmailVerificationToken   *string    `json:"-" gorm:"type:varchar(255);index:idx_email_verify_token"`
+	EmailVerificationExpires *time.Time `json:"-" gorm:"type:timestamp"`
+	PasswordResetToken       *string    `json:"-" gorm:"type:varchar(255);index:idx_password_reset_token"`
+	PasswordResetExpires     *time.Time `json:"-" gorm:"type:timestamp"`
+	LastLoginAt              *time.Time `json:"lastLoginAt,omitempty" gorm:"type:timestamp"`
+}
+
+// TableName specifies the table name for GORM
+func (User) TableName() string {
+	return "users"
+}
+
+// BeforeCreate hook to generate UUID if not set
+func (u *User) BeforeCreate(tx *gorm.DB) error {
+	if u.UserId == "" {
+		u.UserId = uuid.New().String()
+	}
+	return nil
+}
+
+// BeforeUpdate hook to update UpdatedAt
+func (u *User) BeforeUpdate(tx *gorm.DB) error {
+	u.UpdatedAt = time.Now()
+	return nil
 }
 
 type RegisterRequest struct {

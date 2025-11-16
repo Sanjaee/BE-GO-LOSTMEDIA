@@ -3,6 +3,7 @@ package mq
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/streadway/amqp"
@@ -53,6 +54,7 @@ func PublishEmail(message *EmailMessage) error {
 		return fmt.Errorf("failed to publish email message: %w", err)
 	}
 
+	log.Printf("[RABBITMQ] Published email message to queue: type=%s, to=%s", message.Type, message.To)
 	return nil
 }
 
