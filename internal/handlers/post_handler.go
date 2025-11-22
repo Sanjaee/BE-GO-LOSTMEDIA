@@ -166,6 +166,30 @@ func (h *PostHandler) GetAllPosts(c *gin.Context) {
 	// Optional explicit ownerId query (?userId=...) to filter by post owner
 	ownerId := c.Query("userId")
 	if ownerId != "" {
+		// If user is authenticated, always use userId from JWT token (internal UUID)
+		// This is because frontend may send Google ID but database uses UUID
+		// Query param is ignored for authenticated users for security and correctness
+		if viewerUserId != nil {
+			// Use internal userId from JWT token (UUID) instead of query param
+			response, err := h.postUsecase.GetUserPosts(*viewerUserId, limit, offset)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, ErrorResponse{
+					Error: ErrorDetail{
+						Code:    "INTERNAL_ERROR",
+						Message: err.Error(),
+					},
+				})
+				return
+			}
+
+			c.JSON(http.StatusOK, Response{
+				Data: response,
+			})
+			return
+		}
+
+		// Unauthenticated user with query param - allow but may return empty
+		// Note: This might not work if ownerId is Google ID and database uses UUID
 		response, err := h.postUsecase.GetUserPosts(ownerId, limit, offset)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
