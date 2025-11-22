@@ -36,6 +36,13 @@ func SetupRoutes(authHandler *handlers.AuthHandler, postHandler *handlers.PostHa
 			auth.POST("/forgot-password", authHandler.ForgotPassword)
 			auth.POST("/verify-reset-password", authHandler.VerifyResetPassword)
 			auth.POST("/reset-password", authHandler.ResetPassword)
+
+			// Protected auth routes
+			authProtected := auth.Group("", middleware.AuthMiddleware())
+			{
+				authProtected.GET("/me", authHandler.GetCurrentUser)
+				authProtected.PUT("/profile", authHandler.UpdateProfile)
+			}
 		}
 
 		// Post routes

@@ -16,6 +16,8 @@ type AuthUsecase interface {
 	ForgotPassword(req *models.ForgotPasswordRequest) error
 	VerifyResetPassword(req *models.VerifyResetPasswordRequest) error
 	ResetPassword(req *models.ResetPasswordRequest) (*models.AuthResponse, error)
+	UpdateProfile(userId string, req *models.UpdateProfileRequest) (*models.UpdateProfileResponse, error)
+	GetUserByID(userId string) (*models.UserResponse, error)
 }
 
 type authUsecase struct {
@@ -196,6 +198,38 @@ func (uc *authUsecase) ResetPassword(req *models.ResetPasswordRequest) (*models.
 	response := utils.ConvertToAuthResponse(user, accessToken, refreshToken, 86400)
 
 	return response, nil
+}
+
+func (uc *authUsecase) UpdateProfile(userId string, req *models.UpdateProfileRequest) (*models.UpdateProfileResponse, error) {
+	// Validate input
+	if req.Username != nil && (*req.Username == "" || len(*req.Username) < 3) {
+		return nil, &ValidationError{Message: "username must be at least 3 characters"}
+	}
+	if req.Bio != nil && len(*req.Bio) > 500 {
+		return nil, &ValidationError{Message: "bio must be less than 500 characters"}
+	}
+
+	// Update profile
+	user, err := uc.authService.UpdateProfile(userId, req)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &models.UpdateProfileResponse{
+		User:    utils.ConvertUserToResponse(user),
+		Message: "Profile updated successfully",
+	}
+
+	return response, nil
+}
+
+func (uc *authUsecase) GetUserByID(userId string) (*models.UserResponse, error) {
+	user, err := uc.authService.GetUserByID(userId)
+	if err != nil {
+		return nil, err
+	}
+
+	return utils.ConvertUserToResponse(user), nil
 }
 
 // ValidationError represents a validation error

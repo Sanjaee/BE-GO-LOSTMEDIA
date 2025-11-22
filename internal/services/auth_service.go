@@ -23,6 +23,8 @@ type AuthService interface {
 	ForgotPassword(email string) error
 	VerifyResetPassword(token string) error
 	ResetPassword(token, newPassword string) (*models.User, string, string, error)
+	UpdateProfile(userId string, req *models.UpdateProfileRequest) (*models.User, error)
+	GetUserByID(userId string) (*models.User, error)
 }
 
 type authService struct {
@@ -507,4 +509,42 @@ func (s *authService) ResetPassword(token, newPassword string) (*models.User, st
 	_ = mq.PublishLoginEvent(user.UserId, user.Email)
 
 	return user, accessToken, refreshToken, nil
+}
+
+func (s *authService) UpdateProfile(userId string, req *models.UpdateProfileRequest) (*models.User, error) {
+	// Get user by ID
+	user, err := s.userRepo.FindByID(userId)
+	if err != nil {
+		return nil, errors.New("user not found")
+	}
+
+	// Update username if provided (allow duplicate usernames across users)
+	if req.Username != nil && *req.Username != user.Username {
+		user.Username = *req.Username
+	}
+
+	// Update bio if provided
+	if req.Bio != nil {
+		user.Bio = req.Bio
+	}
+
+	// Update profile picture if provided
+	if req.ProfilePic != nil {
+		user.ProfilePic = req.ProfilePic
+	}
+
+	// Save updated user
+	if err := s.userRepo.Update(user); err != nil {
+		return nil, errors.New("failed to update profile")
+	}
+
+	return user, nil
+}
+
+func (s *authService) GetUserByID(userId string) (*models.User, error) {
+	user, err := s.userRepo.FindByID(userId)
+	if err != nil {
+		return nil, errors.New("user not found")
+	}
+	return user, nil
 }

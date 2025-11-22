@@ -125,3 +125,14 @@ type TokenPayload struct {
 	Email  string `json:"email"`
 	Role   string `json:"role"`
 }
+
+type UpdateProfileRequest struct {
+	Username   *string `json:"username,omitempty" binding:"omitempty,min=3,max=50"`
+	Bio        *string `json:"bio,omitempty" binding:"omitempty,max=500"`
+	ProfilePic *string `json:"profilePic,omitempty"`
+}
+
+type UpdateProfileResponse struct {
+	User    *UserResponse `json:"user"`
+	Message string        `json:"message"`
+}

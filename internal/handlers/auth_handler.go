@@ -524,9 +524,143 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	})
 }
 
+// UpdateProfile handles user profile update
+// @Summary Update user profile
+// @Description Update user profile information (username, bio, profile picture)
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body models.UpdateProfileRequest true "Update profile request"
+// @Success 200 {object} Response{data=models.UpdateProfileResponse}
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
+// @Router /api/v1/auth/profile [put]
+func (h *AuthHandler) UpdateProfile(c *gin.Context) {
+	// Get user ID from context (set by AuthMiddleware)
+	userId, exists := c.Get("userId")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Error: ErrorDetail{
+				Code:    "UNAUTHORIZED",
+				Message: "User ID not found in context",
+			},
+		})
+		return
+	}
+
+	userIdStr, ok := userId.(string)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Error: ErrorDetail{
+				Code:    "UNAUTHORIZED",
+				Message: "Invalid user ID format",
+			},
+		})
+		return
+	}
+
+	var req models.UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error: ErrorDetail{
+				Code:    "VALIDATION_ERROR",
+				Message: err.Error(),
+			},
+		})
+		return
+	}
+
+	response, err := h.authUsecase.UpdateProfile(userIdStr, &req)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		errorCode := "INTERNAL_ERROR"
+		errorMessage := err.Error()
+
+		// Handle specific errors
+		if err.Error() == "user not found" {
+			statusCode = http.StatusNotFound
+			errorCode = "USER_NOT_FOUND"
+		} else if err.Error() == "username already taken" {
+			statusCode = http.StatusConflict
+			errorCode = "USERNAME_TAKEN"
+		} else if err.Error() == "username must be at least 3 characters" ||
+			err.Error() == "bio must be less than 500 characters" {
+			statusCode = http.StatusBadRequest
+			errorCode = "VALIDATION_ERROR"
+		}
+
+		c.JSON(statusCode, ErrorResponse{
+			Error: ErrorDetail{
+				Code:    errorCode,
+				Message: errorMessage,
+			},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data:    response,
+	})
+}
+
+// GetCurrentUser handles getting current user profile
+// @Summary Get current user
+// @Description Get current authenticated user profile
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} Response{data=models.UserResponse}
+// @Failure 401 {object} ErrorResponse
+// @Router /api/v1/auth/me [get]
+func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
+	// Get user ID from context (set by AuthMiddleware)
+	userId, exists := c.Get("userId")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Error: ErrorDetail{
+				Code:    "UNAUTHORIZED",
+				Message: "User ID not found in context",
+			},
+		})
+		return
+	}
+
+	userIdStr, ok := userId.(string)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Error: ErrorDetail{
+				Code:    "UNAUTHORIZED",
+				Message: "Invalid user ID format",
+			},
+		})
+		return
+	}
+
+	user, err := h.authUsecase.GetUserByID(userIdStr)
+	if err != nil {
+		c.JSON(http.StatusNotFound, ErrorResponse{
+			Error: ErrorDetail{
+				Code:    "USER_NOT_FOUND",
+				Message: "User not found",
+			},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data:    user,
+	})
+}
+
 // Response represents a success response
 type Response struct {
-	Data interface{} `json:"data"`
+	Success bool        `json:"success,omitempty"`
+	Data    interface{} `json:"data"`
 }
 
 // ErrorResponse represents an error response

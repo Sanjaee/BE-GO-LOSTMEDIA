@@ -25,7 +25,6 @@ type UserRepository interface {
 	UpdatePasswordResetToken(userId, token string, expiresAt time.Time) error
 	ClearPasswordResetToken(userId string) error
 	ExistsByEmail(email string) (bool, error)
-	ExistsByUsername(username string) (bool, error)
 }
 
 type userRepository struct {
@@ -160,11 +159,5 @@ func (r *userRepository) ClearPasswordResetToken(userId string) error {
 func (r *userRepository) ExistsByEmail(email string) (bool, error) {
 	var count int64
 	err := r.db.Model(&models.User{}).Where("email = ?", email).Count(&count).Error
-	return count > 0, err
-}
-
-func (r *userRepository) ExistsByUsername(username string) (bool, error) {
-	var count int64
-	err := r.db.Model(&models.User{}).Where("username = ?", username).Count(&count).Error
 	return count > 0, err
 }

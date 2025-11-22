@@ -157,13 +157,34 @@ func (h *PostHandler) GetAllPosts(c *gin.Context) {
 		offset = 0
 	}
 
-	var userId *string
+	var viewerUserId *string
 	if uid, exists := c.Get("userId"); exists {
 		uidStr := uid.(string)
-		userId = &uidStr
+		viewerUserId = &uidStr
 	}
 
-	response, err := h.postUsecase.GetAllPosts(limit, offset, userId)
+	// Optional explicit ownerId query (?userId=...) to filter by post owner
+	ownerId := c.Query("userId")
+	if ownerId != "" {
+		response, err := h.postUsecase.GetUserPosts(ownerId, limit, offset)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error: ErrorDetail{
+					Code:    "INTERNAL_ERROR",
+					Message: err.Error(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, Response{
+			Data: response,
+		})
+		return
+	}
+
+	// Default: get all published posts (optionally personalized by viewer)
+	response, err := h.postUsecase.GetAllPosts(limit, offset, viewerUserId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error: ErrorDetail{
@@ -417,4 +438,3 @@ func (h *PostHandler) GetUserPostsCount(c *gin.Context) {
 		Data: response,
 	})
 }
-
